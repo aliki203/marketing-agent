@@ -102,10 +102,11 @@ gradio-adk-agent/
     app.py             # Gradio web interface for the three-agent pipeline
 
     # Testing and debugging utilities
-    debug_async.py     # Debug script for async event processing
-    debug_events.py    # Debug script for synchronous event inspection
-    test_gradio.py     # Simple Gradio functionality test
-    test_runner.py     # ADK runner setup test
+    tests/
+        debug_async.py     # Debug script for async event processing
+        debug_events.py    # Debug script for synchronous event inspection
+        test_gradio.py     # Simple Gradio functionality test
+        test_runner.py     # ADK runner setup test
 
     # Configuration files
     .env               # API keys (not tracked in git, create from .example.env)
