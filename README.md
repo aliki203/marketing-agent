@@ -2,9 +2,27 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
 ![uv](https://img.shields.io/badge/uv-managed-430f8e.svg?style=flat&logo=python&logoColor=white)
+![Gradio Version](https://img.shields.io/badge/gradio-6.1.0-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-This project demonstrates how to build a sequential agent pipeline using [Google's Agent Development Kit (ADK)](https://google.github.io/adk-docs/) with a user-friendly [Gradio](https://gradio.app/) web interface. The pipeline consists of three specialized agents that work together to generate, review, and refactor Python code based on user requests.
+This project demonstrates how to build a sequential agent pipeline using [Google's Agent Development Kit (ADK)](https://google.github.io/adk-docs/) with a user-friendly [Gradio](https://gradio.app/) web interface. 
+
+The pipeline consists of three specialized agents that work together to generate, review, and refactor Python code based on user requests.
+
+```mermaid
+graph LR
+    A[User Request] --> B[Code Writer Agent]
+    B -->|generated_code| C[Code Reviewer Agent]
+    C -->|review_comments| D[Code Refactorer Agent]
+    D -->|refactored_code| E[Final Output]
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1f5
+    style D fill:#e1ffe1
+    style E fill:#f0f0f0
+```
+
 
 ## What You'll Learn
 
@@ -79,16 +97,28 @@ The project has the following structure:
 
 ```bash
 gradio-adk-agent/
-    agents.py          # agent definitions and pipeline configuration
-    app.py             # Gradio web interface
-    .env               # API keys (not tracked in git)
-    pyproject.toml     # project dependencies
-    .gitignore         # git ignore file
+    # Main application files
+    agents.py          # Agent definitions and pipeline configuration
+    app.py             # Gradio web interface for the three-agent pipeline
+
+    # Testing and debugging utilities
+    debug_async.py     # Debug script for async event processing
+    debug_events.py    # Debug script for synchronous event inspection
+    test_gradio.py     # Simple Gradio functionality test
+    test_runner.py     # ADK runner setup test
+
+    # Configuration files
+    .env               # API keys (not tracked in git, create from .example.env)
+    .example.env       # Template for environment variables
+    pyproject.toml     # Project dependencies managed by uv
+    uv.lock            # UV dependency lock file
+    .python-version    # Python version specification (3.12)
+    .gitignore         # Git ignore file
 ```
 
 ### Understanding the Agents
 
-Open the `agents.py` file to see how the three agents are defined:
+Open the [agents.py](agents.py) file to see how the three agents are defined:
 
 #### 1. Code Writer Agent
 ```python
@@ -138,12 +168,13 @@ The `SequentialAgent` orchestrates the three agents, ensuring they execute in or
 
 ### Understanding the Gradio Interface
 
-Open the `app.py` file to see how the Gradio interface is built:
+Open the [app.py](app.py) file to see how the Gradio interface is built:
 
 - **User Input**: A text box where users describe what code they want
 - **Three Output Panels**: Display the output from each agent
 - **Process Flow**: The `process_request_async` function handles the agent pipeline execution
 - **State Management**: Agent outputs are extracted from the `state_delta` in events
+
 
 ## Run the Application
 
@@ -184,7 +215,7 @@ You can customize the agents by modifying their properties in `agents.py`:
 
 ### Change the Model
 ```python
-GEMINI_MODEL = "gemini-2.5-flash"  # or try "gemini-2.0-pro"
+GEMINI_MODEL = "gemini-2.5-flash"  
 ```
 
 ### Modify Agent Instructions
@@ -201,9 +232,9 @@ You can extend the pipeline by adding more agents to the `sub_agents` list in th
 ### Sequential Agent Execution
 The pipeline uses ADK's `SequentialAgent` to ensure agents execute in order:
 1. User submits a request
-2. Code Writer generates initial code ’ stored in `generated_code`
-3. Code Reviewer analyzes the code ’ stored in `review_comments`
-4. Code Refactorer improves the code ’ stored in `refactored_code`
+2. Code Writer generates initial code ï¿½ stored in `generated_code`
+3. Code Reviewer analyzes the code ï¿½ stored in `review_comments`
+4. Code Refactorer improves the code ï¿½ stored in `refactored_code`
 
 ### Asynchronous Processing
 The application uses async/await to handle agent execution:
@@ -250,6 +281,3 @@ Agents communicate through shared state:
 - [Gradio Documentation](https://gradio.app/docs/)
 - [Google AI Studio](https://aistudio.google.com/)
 
-## License
-
-MIT
