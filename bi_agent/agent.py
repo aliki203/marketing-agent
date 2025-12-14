@@ -10,6 +10,7 @@ This module uses Google ADK's SequentialAgent to chain agents together:
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.runners import InMemoryRunner
+from bi_agent.tools import execute_sql_and_format, get_database_schema
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -27,7 +28,7 @@ text_to_sql_agent = LlmAgent(
 
 ## Context
 You are operating in a Business Intelligence environment with access to a Microsoft SQL Server database.
-You will receive a database schema (tables and columns) and user questions about the data.
+You have a tool to retrieve the database schema and will receive user questions about the data.
 
 ## Objective
 Your primary goal is to generate accurate, efficient SQL SELECT queries that answer the user's natural language question.
@@ -41,7 +42,7 @@ You prioritize query correctness and readability over complexity.
 Your queries will be executed by a Business Intelligence system and the results shown to business analysts and non-technical stakeholders.
 
 ## Attitude
-Be precise and methodical. Never guess table or column names - use only what exists in the provided schema.
+Be precise and methodical. Never guess table or column names - use only what exists in the schema.
 If the question is ambiguous, choose the most reasonable interpretation based on available data.
 Never make up data or assume tables exist that are not in the schema.
 
@@ -55,24 +56,26 @@ Do NOT include:
 
 ## Specifications
 HARD CONSTRAINTS:
-1. Use ONLY SELECT statements (NEVER INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE)
-2. Reference ONLY tables and columns present in the provided schema
-3. Do NOT include semicolons at the end of queries
-4. Do NOT wrap output in markdown code blocks
+1. ALWAYS use the get_database_schema tool FIRST to retrieve the database structure
+2. Use ONLY SELECT statements (NEVER INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE)
+3. Reference ONLY tables and columns present in the schema
+4. Do NOT include semicolons at the end of queries
+5. Do NOT wrap output in markdown code blocks
 
 </system_prompt>
 
 <instructions>
-Before generating the SQL query, follow this thinking process:
+Before generating the SQL query, follow this process:
 
 <thinking_process>
-1. Identify the user's question and extract key entities (what data they want)
-2. Map the question to relevant tables and columns in the schema
-3. Determine if JOINs are needed (multiple tables?)
-4. Determine if aggregation is needed (COUNT, SUM, AVG, etc.)
-5. Determine if filtering is needed (WHERE clause)
-6. Determine if sorting/limiting is needed (ORDER BY, TOP N)
-7. Construct the SQL query using proper syntax
+1. Use the get_database_schema tool to retrieve available tables and columns
+2. Identify the user's question and extract key entities (what data they want)
+3. Map the question to relevant tables and columns in the schema
+4. Determine if JOINs are needed (multiple tables?)
+5. Determine if aggregation is needed (COUNT, SUM, AVG, etc.)
+6. Determine if filtering is needed (WHERE clause)
+7. Determine if sorting/limiting is needed (ORDER BY, TOP N)
+8. Construct the SQL query using proper syntax
 </thinking_process>
 
 SQL QUERY CONSTRUCTION RULES:
@@ -111,6 +114,7 @@ SQL QUERY CONSTRUCTION RULES:
   </example>
 </examples>
     """,
+    tools=[get_database_schema],
     output_key="sql_query"
 )
 
@@ -396,3 +400,113 @@ insight_pipeline = SequentialAgent(
 
 # Runner for the insight pipeline
 insight_runner = InMemoryRunner(agent=insight_pipeline, app_name='insights')
+
+
+# ============================================================================
+# Agent 2: SQL Executor
+# ============================================================================
+
+sql_executor_agent = LlmAgent(
+    model=GEMINI_MODEL,
+    name='sql_executor_agent',
+    description="Executes SQL queries against the database and returns results.",
+    instruction="""
+<system_prompt>
+
+## Context
+You are a SQL execution agent in a Business Intelligence pipeline.
+You receive SQL queries from the text-to-SQL agent and execute them against the database.
+
+## Objective
+Your goal is to execute the provided SQL query and return the results in a structured format.
+Success is defined by: (1) successfully executing valid SQL, (2) returning data in JSON format, (3) handling errors gracefully.
+
+## Mode
+Act as a Database Execution Engine.
+You take SQL queries as input and return query results.
+
+## Attitude
+Be reliable and efficient.
+Always use the execute_sql_and_format tool to run queries.
+Return results exactly as provided by the tool.
+
+## Specifications
+HARD CONSTRAINTS:
+1. ALWAYS use the execute_sql_and_format tool to execute queries
+2. The SQL query is provided in the state variable: {sql_query}
+3. Return the tool's output directly without modification
+4. Do NOT try to execute queries without the tool
+
+</system_prompt>
+
+<instructions>
+1. Retrieve the SQL query from state: {sql_query}
+2. Use the execute_sql_and_format tool to execute it
+3. Return the tool's response (JSON with success, data, columns, row_count)
+</instructions>
+    """,
+    tools=[execute_sql_and_format],
+    output_key="query_results"
+)
+
+
+# ============================================================================
+# Agent 3: Data Formatter for Visualization
+# ============================================================================
+
+data_formatter_agent = LlmAgent(
+    model=GEMINI_MODEL,
+    name='data_formatter_agent',
+    description="Formats query results for visualization and explanation agents.",
+    instruction="""
+<system_prompt>
+
+## Context
+You are a data formatting agent in the BI pipeline.
+You receive query results in JSON format and prepare them for the visualization and explanation agents.
+
+## Objective
+Extract and format the data from query results so downstream agents can work with it effectively.
+
+## Instructions
+1. Parse the query results from: {query_results}
+2. Extract the 'data' field (list of dictionaries)
+3. Format it as a clear, readable JSON structure
+4. Include information about:
+   - Number of rows returned
+   - Column names
+   - Sample data (first 10 rows if many)
+
+Output format:
+```
+Data Results: [row count] rows returned
+
+Columns: [column names]
+
+Data (as JSON):
+[formatted data]
+```
+
+</system_prompt>
+    """,
+    output_key="formatted_data"
+)
+
+
+# ============================================================================
+# Root Agent: Complete BI Pipeline (SequentialAgent)
+# ============================================================================
+
+root_agent = SequentialAgent(
+    name='root_agent',
+    description="Complete BI pipeline: natural language → SQL → execution → visualization → explanation",
+    sub_agents=[
+        text_to_sql_agent,      # Step 1: Generate SQL from question
+        sql_executor_agent,      # Step 2: Execute SQL and get results
+        data_formatter_agent,    # Step 3: Format data for downstream agents
+        insight_pipeline         # Step 4: Visualize and explain (Sequential: viz → explanation)
+    ]
+)
+
+# Runner for the root agent
+root_runner = InMemoryRunner(agent=root_agent, app_name='bi_agent')

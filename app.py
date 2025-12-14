@@ -15,35 +15,50 @@ import altair as alt
 from dotenv import load_dotenv
 from google.genai import types
 
-# Import agents and BI service
-from agents import text_to_sql_runner, insight_runner
-from bi_service import BIService
+# Import root agent runner
+from bi_agent import root_runner
 
-load_dotenv()
-
-
-# Load default database credentials from environment
-DEFAULT_SERVER = os.getenv("MSSQL_SERVER", "")
-DEFAULT_DATABASE = os.getenv("MSSQL_DATABASE", "")
-DEFAULT_USERNAME = os.getenv("MSSQL_USERNAME", "")
-DEFAULT_PASSWORD = os.getenv("MSSQL_PASSWORD", "")
+# Load environment variables from bi_agent/.env
+load_dotenv(dotenv_path='bi_agent/.env')
 
 
-async def call_agent_async(runner, message_text, app_name='agent'):
-    """Helper function to call an agent/pipeline and extract results."""
-    session = await runner.session_service.create_session(user_id='user', app_name=app_name)
+async def run_bi_pipeline_async(user_question: str):
+    """
+    Run the complete BI pipeline using root_runner.
 
-    content = types.Content(
-        role='user',
-        parts=[types.Part(text=message_text)]
+    This function executes the entire BI pipeline:
+    1. Text-to-SQL: Generate SQL from question
+    2. SQL Execution: Execute query against database
+    3. Data Formatting: Prepare results
+    4. Visualization: Generate Altair chart
+    5. Explanation: Provide plain-language insights
+
+    Args:
+        user_question: Natural language question from the user
+
+    Returns:
+        Dictionary with keys: sql_query, query_results, chart_spec, explanation_text
+    """
+    # Create session
+    session = await root_runner.session_service.create_session(
+        user_id='user',
+        app_name='bi_agent'
     )
 
-    events_async = runner.run_async(
+    # Create user message
+    content = types.Content(
+        role='user',
+        parts=[types.Part(text=user_question)]
+    )
+
+    # Run the complete pipeline
+    events_async = root_runner.run_async(
         user_id='user',
         session_id=session.id,
         new_message=content
     )
 
+    # Extract results from state
     results = {}
     async for event in events_async:
         if event.actions and event.actions.state_delta:
@@ -53,97 +68,70 @@ async def call_agent_async(runner, message_text, app_name='agent'):
     return results
 
 
-async def process_request_async(
-    message: str,
-    server: str,
-    database: str,
-    username: str,
-    password: str
-):
+async def process_request_async(message: str):
     """
-    Process user request through the BI pipeline.
+    Process user request through the BI pipeline using root_runner.
 
-    Pipeline:
-    1. Text-to-SQL Agent → Generates SQL
-    2. BIService → Executes SQL
-    3. Insight Pipeline (SequentialAgent) → Visualization + Explanation
+    The root_agent handles the complete pipeline:
+    1. Text-to-SQL Agent → Generates SQL from question
+    2. SQL Executor Agent → Executes SQL against database
+    3. Data Formatter Agent → Formats results
+    4. Insight Pipeline → Visualization + Explanation
+
+    Args:
+        message: User's natural language question
+
+    Returns:
+        Tuple of (sql_query, df, chart, explanation_text)
     """
     try:
-        # Validate inputs
+        # Validate input
         if not message.strip():
             return "Error: Please enter a question", None, None, "Error: No question provided"
 
-        if not all([server, database, username, password]):
-            return "Error: Missing database credentials", None, None, "Error: Please provide all database connection details"
+        # Run the complete BI pipeline
+        results = await run_bi_pipeline_async(message)
 
-        # ====================================================================
-        # Initialize BI Service
-        # ====================================================================
-        bi_service = BIService(server, database, username, password)
+        # Extract SQL query
+        sql_query = results.get('sql_query', '')
 
-        # Connect to database
-        is_connected, conn_message = bi_service.connect()
-        if not is_connected:
-            return f"Error: {conn_message}", None, None, "Error: Could not connect to database"
-
-        # Load database schema
-        try:
-            bi_service.load_schema(max_tables=20)
-        except Exception as e:
-            return f"Error retrieving schema: {str(e)}", None, None, "Error: Could not retrieve database schema"
-
-        # ====================================================================
-        # Step 1: Call Text-to-SQL Agent
-        # ====================================================================
-        sql_prompt = bi_service.get_schema_for_sql_generation(message)
-        sql_results = await call_agent_async(text_to_sql_runner, sql_prompt, 'text_to_sql')
-        sql_query = sql_results.get('sql_query', '')
-
-        # Clean up SQL query
+        # Clean up SQL query (remove markdown if present)
         sql_query = sql_query.strip()
         if sql_query.startswith("```sql"):
             sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
         elif sql_query.startswith("```"):
             sql_query = sql_query.replace("```", "").strip()
 
-        # ====================================================================
-        # Step 2: Execute SQL Query via BI Service
-        # ====================================================================
-        result = bi_service.execute_sql(sql_query)
+        # Extract query results
+        query_results_str = results.get('query_results', '{}')
+        try:
+            import json
+            query_results = json.loads(query_results_str) if isinstance(query_results_str, str) else query_results_str
+        except:
+            query_results = {'success': False, 'data': [], 'error': 'Failed to parse query results'}
 
-        if not result['success']:
-            error_msg = result['error']
+        # Check if query execution was successful
+        if not query_results.get('success', False):
+            error_msg = query_results.get('error', 'Unknown error')
             sql_query = f"-- Error executing query\n{sql_query}\n\n-- Error: {error_msg}"
-            bi_service.close()
             return sql_query, None, None, f"Error executing query: {error_msg}"
 
-        df = result['data']
-
-        if df.empty:
-            bi_service.close()
+        # Convert query results to DataFrame
+        data_list = query_results.get('data', [])
+        if not data_list:
+            df = pd.DataFrame()
             return sql_query, df, None, "The query executed successfully but returned no data."
 
-        # ====================================================================
-        # Step 3: Call Insight Pipeline (SequentialAgent)
-        # Pipeline: Visualization Agent → Explanation Agent
-        # ====================================================================
+        df = pd.DataFrame(data_list)
+
+        # Extract chart specification and explanation
+        chart_spec = results.get('chart_spec', '')
+        explanation_text = results.get('explanation_text', '')
+
+        # Execute chart specification
         chart = None
-        explanation_text = ""
-
-        try:
-            # Prepare data for insight agents
-            insight_prompt = bi_service.prepare_data_for_agents(df, sql_query)
-            insight_prompt += "\n\nPlease generate a visualization and explanation for this data."
-
-            # Call the insight pipeline (SequentialAgent)
-            insight_results = await call_agent_async(insight_runner, insight_prompt, 'insights')
-
-            # Extract results
-            chart_spec = insight_results.get('chart_spec', '')
-            explanation_text = insight_results.get('explanation_text', '')
-
-            # Execute chart specification
-            if chart_spec:
+        if chart_spec:
+            try:
                 chart_spec_clean = chart_spec.strip()
                 if chart_spec_clean.startswith("```python"):
                     chart_spec_clean = chart_spec_clean.replace("```python", "").replace("```", "").strip()
@@ -162,15 +150,10 @@ async def process_request_async(
 
                 if 'chart' in namespace:
                     chart = namespace['chart']
-
-        except Exception as e:
-            print(f"Insight pipeline error: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            explanation_text = "Unable to generate insights."
-
-        # Clean up
-        bi_service.close()
+            except Exception as e:
+                print(f"Chart generation error: {str(e)}")
+                import traceback
+                traceback.print_exc()
 
         # Return all four outputs
         return sql_query, df, chart, explanation_text
@@ -183,11 +166,15 @@ async def process_request_async(
         return error_msg, None, None, error_msg
 
 
-def process_request(message: str, server: str, database: str, username: str, password: str):
-    """Synchronous wrapper for Gradio."""
+def process_request(message: str):
+    """
+    Synchronous wrapper for Gradio.
+
+    Database credentials are read from environment variables in bi_agent/.env
+    """
     try:
         sql_query, df, chart, explanation = asyncio.run(
-            process_request_async(message, server, database, username, password)
+            process_request_async(message)
         )
         return sql_query, df, chart, explanation
     except Exception as e:
@@ -203,11 +190,14 @@ with gr.Blocks(title="Business Intelligence Agent") as demo:
     gr.Markdown("""
     # Business Intelligence Agent (Google ADK)
 
-    This demo uses **Google ADK's SequentialAgent pattern**:
+    This demo uses **Google ADK's root_agent SequentialAgent**:
 
     1. **Text-to-SQL Agent** → Generates SQL from natural language
-    2. **BI Service** → Executes SQL against database
-    3. **Insight Pipeline** (**SequentialAgent**) → Visualization Agent → Explanation Agent
+    2. **SQL Executor Agent** → Executes SQL against database
+    3. **Data Formatter Agent** → Prepares results for visualization
+    4. **Insight Pipeline** (**SequentialAgent**) → Visualization Agent → Explanation Agent
+
+    Database credentials are configured in `bi_agent/.env`
 
     Enter your question below and click "Analyze Data".
     """)
@@ -218,35 +208,6 @@ with gr.Blocks(title="Business Intelligence Agent") as demo:
             placeholder="e.g., 'What are the top 10 products by price?'",
             lines=3
         )
-
-    # Database configuration
-    with gr.Accordion("Database Configuration", open=False):
-        gr.Markdown("Configure your SQL Server connection details:")
-
-        with gr.Row():
-            server_input = gr.Textbox(
-                label="Server",
-                value=DEFAULT_SERVER,
-                placeholder="e.g., dwh.hdm-server.eu"
-            )
-            database_input = gr.Textbox(
-                label="Database",
-                value=DEFAULT_DATABASE,
-                placeholder="e.g., AdventureBikes Sales DataMart"
-            )
-
-        with gr.Row():
-            username_input = gr.Textbox(
-                label="Username",
-                value=DEFAULT_USERNAME,
-                placeholder="Database username"
-            )
-            password_input = gr.Textbox(
-                label="Password",
-                value=DEFAULT_PASSWORD,
-                type="password",
-                placeholder="Database password"
-            )
 
     with gr.Row():
         submit_btn = gr.Button("Analyze Data", variant="primary")
@@ -297,7 +258,7 @@ with gr.Blocks(title="Business Intelligence Agent") as demo:
     # Button actions
     submit_btn.click(
         fn=process_request,
-        inputs=[user_input, server_input, database_input, username_input, password_input],
+        inputs=[user_input],
         outputs=[sql_output, data_output, chart_output, explanation_output]
     )
 

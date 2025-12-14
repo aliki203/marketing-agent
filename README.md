@@ -1,28 +1,45 @@
-# Business Intelligence Agent with Google ADK & Gradio
+# Business Intelligence Agent with Google ADK
 
 ![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
 ![uv](https://img.shields.io/badge/uv-managed-430f8e.svg?style=flat&logo=python&logoColor=white)
 ![Gradio Version](https://img.shields.io/badge/gradio-6.1.0-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-This project demonstrates how to build a **Business Intelligence agent system** using [Google's Agent Development Kit (ADK)](https://google.github.io/adk-docs/) with a [Gradio](https://gradio.app/) web interface.
+A production-ready **Business Intelligence agent system** built with [Google's Agent Development Kit (ADK)](https://google.github.io/adk-docs/) featuring dual interfaces: ADK web and [Gradio](https://gradio.app/).
 
-The system converts natural language questions into SQL queries, executes them against a Microsoft SQL Server database, and automatically generates visualizations and explanations using Google's Gemini AI.
+The system converts natural language questions into SQL queries, executes them against Microsoft SQL Server, and automatically generates visualizations and explanations using Google's Gemini AI.
+
+## ✨ Key Features
+
+- 🤖 **Multi-Agent Pipeline**: Sequential agent workflow using ADK's SequentialAgent pattern
+- 🌐 **Dual Interfaces**: ADK web UI + Gradio web interface (same agent logic)
+- 🔐 **Production-Ready**: COMPASS framework prompts, SQL validation, error handling
+- 📊 **Auto-Visualization**: Intelligent chart generation with Altair
+- 💬 **Business Insights**: AI-powered plain-language explanations
+- 🛠️ **Tool-Based Architecture**: Agents use tools for database operations
 
 ## Architecture Overview
 
 ```mermaid
 graph TB
-    A[User Question] --> B[Text-to-SQL Agent]
-    B -->|SQL Query| C[BI Service]
-    B -->|SQL Query| H[Gradio UI]
-    C -->|Database Connection| D[(MS SQL Server)]
-    D -->|Query Results| C
-    C -->|DataFrame| E[Insight Pipeline]
-    E --> F[Visualization Agent]
-    E --> G[Explanation Agent]
-    F -->|Altair Chart| H
-    G -->|Business Insights| H
+    A[User Question] --> B[root_agent]
+
+    subgraph "root_agent (SequentialAgent)"
+        B --> C[1. text_to_sql_agent]
+        C -->|get_database_schema| C1[Schema Tool]
+        C -->|sql_query| D[2. sql_executor_agent]
+        D -->|execute_sql_and_format| D1[SQL Execution Tool]
+        D -->|query_results| E[3. data_formatter_agent]
+        E -->|formatted_data| F[4. insight_pipeline]
+
+        subgraph "insight_pipeline (SequentialAgent)"
+            F --> G[visualization_agent]
+            G -->|chart_spec| H[explanation_agent]
+        end
+    end
+
+    H -->|Results| I[ADK Web / Gradio UI]
+    D1 -.->|queries| J[(MS SQL Server)]
 
     style A fill:#e1f5ff
     style B fill:#fff4e1
@@ -31,74 +48,74 @@ graph TB
     style E fill:#f5e1ff
     style F fill:#ffe1f5
     style G fill:#fff4e1
-    style H fill:#f0f0f0
-
-    subgraph "Google ADK Agents"
-        B
-        E
-        F
-        G
-    end
-
-    subgraph "Database Layer"
-        C
-        D
-    end
+    style H fill:#e1ffe1
+    style I fill:#f0f0f0
+    style J fill:#d4edda
 ```
 
-### How it works
+### How It Works
 
-1. **User Question** enters the system and is processed by the **Text-to-SQL Agent**, which generates a SQL query
-2. The **SQL query** is sent to both the **BI Service** (for execution) and the **Gradio UI** (for display)
-3. The **BI Service** connects to the **MS SQL Server** database, executes the query, and receives results
-4. Query results are formatted as a **DataFrame** and sent to the **Insight Pipeline**
-5. The **Insight Pipeline** coordinates two specialized agents:
-   - **Visualization Agent** creates an Altair chart
-   - **Explanation Agent** generates business insights
-6. All outputs (SQL query, chart, and insights) are displayed in the **Gradio UI**
+1. **User Question** enters the `root_agent` (SequentialAgent)
+2. **text_to_sql_agent** retrieves schema and generates SQL query
+3. **sql_executor_agent** executes SQL against database via tool
+4. **data_formatter_agent** prepares results for visualization
+5. **insight_pipeline** (SequentialAgent) creates:
+   - **visualization_agent**: Altair chart code
+   - **explanation_agent**: Business insights
+6. All outputs displayed in **ADK web** or **Gradio UI**
 
 ## What You'll Learn
 
-In this tutorial, you will:
-- Build a multi-agent BI system using Google ADK's **SequentialAgent** pattern
-- Apply the **COMPASS framework** for production-ready prompt engineering
-- Implement **Chain of Thought** reasoning to reduce AI hallucinations
-- Use **XML tags** and **few-shot examples** for reliable agent behavior
-- Connect to Microsoft SQL Server databases with SQLAlchemy
-- Generate SQL queries from natural language using AI
-- Execute queries safely with validation and error handling
-- Create automatic visualizations with Altair
-- Generate business insights with AI-powered explanations
-- Build an interactive web interface with Gradio
+- Build production-ready multi-agent systems with Google ADK
+- Implement the **COMPASS framework** for reliable prompts
+- Use **Chain of Thought** reasoning to reduce AI hallucinations
+- Create **tool-based agents** for database operations
+- Structure projects for both ADK web and custom UIs
+- Handle SQL safely with validation and error handling
+- Generate automatic visualizations with AI
+- Deploy dual interfaces with shared agent logic
 
-## The Agent Pipeline
+## The Agent Architecture
 
-The application features a sophisticated multi-agent workflow:
+### Root Agent (Entry Point)
 
-### 1. **Text-to-SQL Agent**
-Converts natural language questions into valid SQL queries using the database schema as context.
+```python
+root_agent = SequentialAgent(
+    name='root_agent',
+    sub_agents=[
+        text_to_sql_agent,      # SQL generation
+        sql_executor_agent,      # Query execution
+        data_formatter_agent,    # Data formatting
+        insight_pipeline         # Viz + Explanation
+    ]
+)
+```
 
-### 2. **BI Service** (Database Layer)
-- Manages database connections
-- Validates and executes SQL queries
-- Handles schema retrieval and data formatting
+The **root_agent** orchestrates the complete BI pipeline as a single SequentialAgent.
 
-### 3. **Insight Pipeline** (SequentialAgent)
-A chained agent workflow that processes query results:
-- **Visualization Agent**: Generates appropriate Altair chart code based on data shape
-- **Explanation Agent**: Provides plain-language business insights
+### Sub-Agents
 
-### 4. **Gradio UI**
-Displays four synchronized outputs:
-- Generated SQL query
-- Data table (interactive)
-- Visualization (Altair chart)
-- Business explanation
+#### 1. Text-to-SQL Agent
+Converts natural language to SQL using database schema context.
+
+**Tool**: `get_database_schema()` - Retrieves available tables and columns
+
+#### 2. SQL Executor Agent
+Executes SQL queries safely against the database.
+
+**Tool**: `execute_sql_and_format()` - Validates and runs SELECT queries
+
+#### 3. Data Formatter Agent
+Prepares query results for downstream agents.
+
+#### 4. Insight Pipeline (SequentialAgent)
+- **Visualization Agent**: Generates Altair chart code
+- **Explanation Agent**: Provides business insights
 
 ## Prerequisites
 
 > [!IMPORTANT]
-> Before you begin, ensure you have uv installed, a Gemini API key, and access to a SQL Server database.
+> You need uv, a Gemini API key, and access to a SQL Server database.
 
 ### Required Software
 - `uv` package manager - [Installation guide](https://github.com/kirenz/uv-setup)
@@ -106,39 +123,28 @@ Displays four synchronized outputs:
 - ODBC Driver 18 for SQL Server
   - **macOS**: `brew install msodbcsql18`
   - **Windows**: Usually pre-installed
-  - **Linux**: Follow [Microsoft's guide](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server)
+  - **Linux**: [Microsoft's guide](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server)
 
 ### API Access
 - Free Gemini API key from [Google AI Studio](https://aistudio.google.com/prompts/new_chat)
-- Access to a Microsoft SQL Server database
+- Microsoft SQL Server database access
 
-## Steps to Set Up the Project
+## Quick Start
 
-Open your command line interface and change into the directory where you want to clone this repository.
-
-1. Clone the repository:
+### 1. Clone and Install
 
 ```bash
+# Clone repository
 git clone https://github.com/kirenz/gradio-adk-agent.git
-```
-
-2. Change directory to the cloned repository:
-
-```bash
 cd gradio-adk-agent
-```
 
-3. Install the required dependencies:
-
-```bash
+# Install dependencies
 uv sync
 ```
 
-4. Open the project in your preferred code editor (e.g., VSCode).
+### 2. Configure Environment
 
-5. Create a `.env` file (or rename `.example.env` to `.env`)
-
-6. Add your credentials to the `.env` file:
+Create `bi_agent/.env` (or rename `.example.env`):
 
 ```env
 # Google API Key
@@ -149,508 +155,367 @@ MSSQL_SERVER=your_server_address
 MSSQL_DATABASE=your_database_name
 MSSQL_USERNAME=your_username
 MSSQL_PASSWORD=your_password
-MSSQL_DRIVER=ODBC Driver 18 for SQL Server
-TRUST_SERVER_CERTIFICATE=true
 ```
 
-Save the file.
+### 3. Run the Application
+
+Choose your preferred interface:
+
+**Option 1: ADK Web Interface**
+```bash
+uv run adk web . --port 8000
+```
+Access at: http://127.0.0.1:8000
+
+**Option 2: Gradio Interface**
+```bash
+uv run app.py
+```
+Access at: http://127.0.0.1:7860
+
+Both interfaces use the same `root_agent` pipeline!
 
 ## Project Structure
 
 ```bash
 gradio-adk-agent/
-    # Main application files
-    app.py             # Gradio UI and agent orchestration
-    agents.py          # ADK agent definitions (Text-to-SQL, Visualization, Explanation)
-    bi_service.py      # Business Intelligence service (clean database interface)
-
-    # Database utilities
-    db_config.py       # Database connection configuration
-    sql_executor.py    # SQL validation and safe execution
-
-    # Configuration files
-    .env               # API keys and database credentials (create from .example.env)
-    .example.env       # Template for environment variables
-    pyproject.toml     # Project dependencies managed by uv
-    uv.lock            # UV dependency lock file
-    .python-version    # Python version specification (3.12)
-    .gitignore         # Git ignore file
-
-    # Testing utilities
-    tests/
-        test_gradio.py     # Gradio functionality test
-        test_runner.py     # ADK runner test
+├── bi_agent/                    # Agent package (ADK web compatible)
+│   ├── __init__.py              # Package exports
+│   ├── agent.py                 # root_agent + all sub-agents
+│   ├── tools.py                 # Database tools (schema, SQL execution)
+│   ├── bi_service.py            # BI service utilities
+│   ├── db_config.py             # Database configuration
+│   ├── sql_executor.py          # SQL validation and execution
+│   └── .env                     # API keys and credentials
+│
+├── app.py                       # Gradio web interface
+├── pyproject.toml               # Project dependencies (uv managed)
+├── .python-version              # Python version (3.12)
+└── README.md                    # This file
 ```
+
+### Key Files
+
+**[bi_agent/agent.py](bi_agent/agent.py)** - Agent definitions
+- `root_agent`: Main SequentialAgent (required for ADK web)
+- `text_to_sql_agent`: SQL generation with schema tool
+- `sql_executor_agent`: SQL execution with validation tool
+- `data_formatter_agent`: Result formatting
+- `insight_pipeline`: Visualization + Explanation (SequentialAgent)
+
+**[bi_agent/tools.py](bi_agent/tools.py)** - Agent tools
+- `get_database_schema()`: Retrieves database schema
+- `execute_sql_and_format()`: Executes SQL safely
+
+**[app.py](app.py)** - Gradio interface
+- Uses `root_runner` for the complete pipeline
+- Extracts and displays SQL, data, charts, and insights
 
 ## Understanding the Architecture
 
-### Agents ([agents.py](agents.py))
+### Unified Agent Logic
 
-The system uses **Google ADK's SequentialAgent** pattern to chain agents:
+Both ADK web and Gradio use the **same agent pipeline**:
 
-#### Text-to-SQL Agent (Standalone)
 ```python
+# In bi_agent/__init__.py
+from bi_agent.agent import root_agent, root_runner
+
+# Used by ADK web automatically
+# Used by Gradio in app.py
+results = await root_runner.run_async(...)
+```
+
+**Benefits:**
+- ✅ Single source of truth
+- ✅ No code duplication
+- ✅ Consistent behavior
+- ✅ Easier testing and maintenance
+
+### Tool-Based Design
+
+Agents use tools instead of direct code execution:
+
+```python
+# Text-to-SQL Agent
 text_to_sql_agent = LlmAgent(
-    model="gemini-2.5-flash",
-    name='text_to_sql_agent',
-    description="Converts natural language questions to SQL queries",
+    tools=[get_database_schema],  # Tool for schema
     output_key="sql_query"
 )
-```
 
-#### Insight Pipeline (SequentialAgent)
-```python
-insight_pipeline = SequentialAgent(
-    name='insight_pipeline',
-    sub_agents=[visualization_agent, explanation_agent],
-    description="Generates visualization and explanation from query results"
+# SQL Executor Agent
+sql_executor_agent = LlmAgent(
+    tools=[execute_sql_and_format],  # Tool for execution
+    output_key="query_results"
 )
 ```
 
-The **SequentialAgent** automatically:
-- Chains agents together
-- Passes state between agents via `output_key`
-- Manages execution order
+### State Management
 
-### BI Service ([bi_service.py](bi_service.py))
-
-Clean interface for database operations:
+Agents share data through state variables:
 
 ```python
-class BIService:
-    def connect()                          # Connect to database
-    def load_schema()                      # Retrieve database schema
-    def execute_sql(query)                 # Execute SQL safely
-    def prepare_data_for_agents(df)        # Format data for agents
-    def get_schema_for_sql_generation()    # Build SQL generation prompt
-```
+# Agent 1 outputs
+output_key="sql_query"
 
-This separation of concerns makes the code:
-- **Easier to understand** - Each file has one responsibility
-- **Easier to test** - Database logic isolated
-- **Easier to maintain** - Changes don't ripple across files
-- **Reusable** - BIService can be used in other applications
-
-### Application Flow ([app.py](app.py))
-
-```python
-# 1. Initialize BI Service
-bi_service = BIService(server, database, username, password)
-bi_service.connect()
-bi_service.load_schema()
-
-# 2. Generate SQL with Text-to-SQL Agent
-sql_prompt = bi_service.get_schema_for_sql_generation(user_question)
-sql_query = await call_agent_async(text_to_sql_runner, sql_prompt)
-
-# 3. Execute SQL
-result = bi_service.execute_sql(sql_query)
-df = result['data']
-
-# 4. Generate insights with SequentialAgent pipeline
-insight_prompt = bi_service.prepare_data_for_agents(df, sql_query)
-insights = await call_agent_async(insight_runner, insight_prompt)
-
-# 5. Display: SQL, Data Table, Chart, Explanation
+# Agent 2 receives
+instruction="""
+Use the SQL query from state: {sql_query}
+"""
 ```
 
 ## Prompt Engineering with COMPASS
 
-All agent prompts in this project follow the **COMPASS framework** - a structured approach to building reliable, production-ready AI agents. This ensures consistent behavior, reduces hallucinations, and makes the prompts maintainable.
+All agents use the **COMPASS framework** for production-ready prompts:
 
-### The 3 Pillars of Agentic Prompts
+| Component | Purpose | Example |
+|-----------|---------|---------|
+| **Context** | Agent's environment | "You are operating in a BI environment..." |
+| **Objective** | Primary goal | "Generate accurate SQL SELECT queries..." |
+| **Mode** | Persona/expertise | "Act as a Senior Database Engineer..." |
+| **People** | Target audience | "Business analysts and stakeholders..." |
+| **Attitude** | Behavior guidelines | "Be precise. Never guess table names..." |
+| **Style** | Output format | "Output ONLY raw SQL. No markdown..." |
+| **Specifications** | Hard constraints | "NEVER use INSERT/UPDATE/DELETE..." |
 
-Each agent implements three core techniques:
+### Chain of Thought
 
-#### 1. **Structure (XML Tags)**
-Clear separation between instructions and data using XML tags prevents instruction injection and ambiguity:
-
-```xml
-<system_prompt>
-  ## Context
-  ## Objective
-  ...
-</system_prompt>
-
-<instructions>
-  <thinking_process>
-    1. Step one
-    2. Step two
-  </thinking_process>
-</instructions>
-
-<examples>
-  <example>
-    <input>...</input>
-    <output>...</output>
-  </example>
-</examples>
-```
-
-#### 2. **Reasoning (Chain of Thought)**
-Each agent follows an explicit thinking process before generating output, dramatically improving accuracy:
+Each agent includes explicit reasoning steps:
 
 ```xml
 <thinking_process>
-1. Identify the user's question and extract key entities
-2. Map the question to relevant tables and columns
-3. Determine if JOINs are needed
-4. Determine if aggregation is needed
-5. Construct the SQL query using proper syntax
+1. Use get_database_schema tool to retrieve tables
+2. Identify the user's question entities
+3. Map question to relevant tables/columns
+4. Determine if JOINs are needed
+5. Construct the SQL query
 </thinking_process>
 ```
 
-This forces the model to generate logical intermediate steps, reducing errors and hallucinations.
+This reduces hallucinations by 40-60%!
 
-#### 3. **Examples (Few-Shot Prompting)**
-Multiple examples demonstrate expected behavior more effectively than lengthy instructions:
+### Few-Shot Examples
+
+Agents learn from examples:
 
 ```xml
 <examples>
   <example>
-    <input>
-      Schema: Products (Product_ID, Product_Name, Price)
-      Question: "What are the top 5 products by price?"
-    </input>
+    <input>Question: "What are the top 5 products by price?"</input>
     <output>SELECT TOP 5 Product_Name, Price FROM Products ORDER BY Price DESC</output>
   </example>
 </examples>
 ```
 
-### COMPASS Framework Components
+See [bi_agent/agent.py](bi_agent/agent.py) for complete implementations.
 
-Each agent prompt is structured using all seven COMPASS components:
+## Usage Examples
 
-| Component | Purpose | Example |
-|-----------|---------|---------|
-| **Context** | The agent's environment and available tools | "You are operating in a Business Intelligence environment with access to a Microsoft SQL Server database." |
-| **Objective** | The primary goal and success criteria | "Generate accurate SQL SELECT queries. Success = (1) syntactically correct, (2) schema-valid, (3) logically answers question." |
-| **Mode** | The persona and expertise level | "Act as a Senior Database Engineer with 10+ years of experience writing optimized SQL queries." |
-| **People of Interest** | The target audience | "Your queries will be executed for business analysts and non-technical stakeholders." |
-| **Attitude** | Tone and behavioral guidelines | "Be precise and methodical. Never guess table names - use only what exists in the schema." |
-| **Style** | Output format and structure | "Output ONLY raw SQL. No markdown, no explanations, no semicolons." |
-| **Specifications** | Hard constraints and rules | "NEVER use INSERT/UPDATE/DELETE. NEVER include code fences." |
+### Example Questions
 
-### Agent Prompt Examples
-
-#### Text-to-SQL Agent
-```python
-instruction="""
-<system_prompt>
-## Context
-You are operating in a Business Intelligence environment...
-
-## Objective
-Generate accurate, efficient SQL SELECT queries...
-
-## Mode
-Act as a Senior Database Engineer...
-
-## People of Interest
-Your queries will be executed by a BI system...
-
-## Attitude
-Be precise and methodical. Never guess...
-
-## Style
-Output ONLY the raw SQL query as plain text...
-
-## Specifications
-HARD CONSTRAINTS:
-1. Use ONLY SELECT statements
-2. Reference ONLY tables in the schema
-...
-</system_prompt>
-
-<instructions>
-<thinking_process>
-1. Identify the user's question
-2. Map to relevant tables
-3. Determine if JOINs needed
-...
-</thinking_process>
-</instructions>
-
-<examples>
-  <example>...</example>
-</examples>
-"""
+```
+"What are the top 10 products by price?"
+"Show me product categories and their average prices"
+"List all products in the Bikes category"
+"How many products are there in each category?"
+"What is the most expensive product?"
+"Show monthly sales trends for 2023"
 ```
 
-### Benefits of COMPASS
+### Using ADK Web
 
-- **Reliability**: Chain of Thought reduces hallucinations by 40-60%
-- **Security**: XML structure prevents prompt injection attacks
-- **Consistency**: Few-shot examples ensure predictable outputs
-- **Maintainability**: Clear structure makes updates straightforward
-- **Debuggability**: Easy to identify which component needs adjustment
+1. Start the server:
+   ```bash
+   uv run adk web . --port 8000
+   ```
 
-### Customizing Prompts
+2. Open http://127.0.0.1:8000
 
-When modifying agent behavior, edit the appropriate COMPASS section:
+3. Select **bi_agent** from the agent list
 
-**To change output quality:**
-- Adjust **Objective** (success criteria)
-- Add more **Examples** (few-shot learning)
+4. Ask your question and see:
+   - Agent execution trace
+   - Tool calls
+   - State updates
+   - Final results
 
-**To prevent errors:**
-- Update **Specifications** (hard constraints)
-- Refine **Thinking Process** (reasoning steps)
+### Using Gradio
 
-**To change tone/style:**
-- Modify **Attitude** (behavioral guidelines)
-- Update **Style** (format requirements)
+1. Start the app:
+   ```bash
+   uv run app.py
+   ```
 
-**To add domain knowledge:**
-- Enhance **Context** (environment details)
-- Adjust **Mode** (expertise level)
+2. Open http://127.0.0.1:7860
 
-See [agents.py](agents.py) for complete prompt implementations.
+3. Enter your question and click "Analyze Data"
 
-## Run the Application
+4. View synchronized outputs:
+   - SQL query
+   - Data table
+   - Interactive chart
+   - Business insights
 
-1. Start the application from the project root directory:
+## Customization
 
-```bash
-python app.py
-```
+### Change AI Model
 
-2. Open your web browser and navigate to the URL shown in the terminal (typically <http://127.0.0.1:7860>)
-
-3. You should see the Gradio interface with:
-   - An input box for your natural language question
-   - Database configuration (collapsible)
-   - Four output panels: SQL, Data Table, Visualization, Insights
-   - Example questions
-
-4. Enter a question about your data (e.g., "What are the top 10 products by price?") and click "Analyze Data"
-
-5. Watch as the system:
-   - Generates a SQL query
-   - Executes it against your database
-   - Creates an appropriate visualization
-   - Explains the insights in plain language
-
-6. To stop the application, press `Ctrl + C` in the terminal
-
-## Example Questions
-
-Try these example questions with your database:
-
-- "What are the top 10 products by transfer price?"
-- "Show me the product categories and their average prices"
-- "List all products in the Bikes category"
-- "How many products are there in each category?"
-- "What is the most expensive product?"
-- "Show monthly sales trends for 2023"
-- "Which product category has the highest revenue?"
-
-## Customizing the System
-
-### Change the AI Model
-
-In [agents.py](agents.py), modify the model:
+In [bi_agent/agent.py](bi_agent/agent.py):
 ```python
 GEMINI_MODEL = "gemini-2.5-flash"  # Fast and efficient
 # or
 GEMINI_MODEL = "gemini-2.5-pro"    # More capable, slower
 ```
 
-### Customize Agent Instructions
+### Customize Agent Behavior
 
-All agent prompts follow the **COMPASS framework** (see [Prompt Engineering with COMPASS](#prompt-engineering-with-compass)). To customize agent behavior, edit the appropriate section in [agents.py](agents.py):
+Edit the COMPASS components in agent instructions:
 
-**Text-to-SQL Agent**: Add database-specific guidelines to `Specifications`
+**Add database-specific rules:**
 ```python
 ## Specifications
 HARD CONSTRAINTS:
 1. Use ONLY SELECT statements
 2. Always use the dbo schema
-3. Prefer column aliases for readability
-4. Use ISNULL for null handling
+3. Prefer ISNULL for null handling
 ```
 
-**Visualization Agent**: Specify chart preferences in `Style` or `Specifications`
+**Adjust visualization preferences:**
 ```python
 ## Specifications
-HARD CONSTRAINTS:
-...
 5. Use color scheme: category20
-6. Always add tooltips for interactivity
+6. Always add tooltips
 7. Chart dimensions: width=400-600, height=300-400
 ```
 
-**Explanation Agent**: Adjust tone in `Attitude` and detail level in `Specifications`
+**Change explanation tone:**
 ```python
 ## Attitude
 Be direct and insight-focused.
-Focus on business implications and actionable insights.
+Highlight business implications.
 Include percentage changes when relevant.
-Highlight anomalies or trends clearly.
-
-## Specifications
-HARD CONSTRAINTS:
-1. Write EXACTLY 2-4 sentences
-2. ALWAYS include specific numbers
-3. Mention trends or anomalies when present
 ```
 
-### Connect to Different Databases
+### Add New Tools
 
-Update [.env](.env) with your database credentials:
-```env
-MSSQL_SERVER=your_server.database.windows.net
-MSSQL_DATABASE=your_database
-MSSQL_USERNAME=your_user
-MSSQL_PASSWORD=your_password
-```
+Create tools in [bi_agent/tools.py](bi_agent/tools.py):
 
-### Adjust Security Settings
-
-In [sql_executor.py](sql_executor.py), modify validation rules:
 ```python
-# Allow additional SQL operations (use with caution!)
-BLACKLIST_KEYWORDS = ['DROP', 'DELETE', 'TRUNCATE']  # Reduced list
+def my_custom_tool(param: str) -> str:
+    """Tool description for the LLM."""
+    # Tool implementation
+    return result
 ```
 
-In [bi_service.py](bi_service.py), adjust row limits:
+Add to agent:
 ```python
-def prepare_data_for_agents(self, df, sql_query=""):
-    # Show more sample rows
-    'sample_data': df.head(20).to_dict(orient='records')
+my_agent = LlmAgent(
+    tools=[my_custom_tool],
+    ...
+)
 ```
 
-## How It Works
+## Database Safety
 
-### Sequential Agent Pattern
+Multiple protection layers:
 
-The system demonstrates Google ADK's **SequentialAgent**:
-
-1. **Individual agents** perform specific tasks (SQL generation, visualization, explanation)
-2. **SequentialAgent** chains agents together automatically
-3. **State management** via `output_key` passes data between agents
-4. **InMemoryRunner** executes agents and manages sessions
-
-### Database Safety
-
-Multiple layers of protection:
-- **SQL Validation**: Only SELECT statements allowed
-- **Query Timeout**: 30-second execution limit
-- **Row Limits**: Automatic TOP N insertion for large queries
-- **Connection Management**: Proper cleanup and disposal
-
-### Visualization Intelligence
-
-The Visualization Agent analyzes data characteristics to choose appropriate chart types:
-- **Time series** → Line charts
-- **Categories** → Bar charts
-- **Correlations** → Scatter plots
-- **Distributions** → Histograms
+- ✅ **SQL Validation**: Only SELECT statements allowed
+- ✅ **Query Timeout**: 30-second execution limit
+- ✅ **Row Limits**: Automatic TOP N insertion
+- ✅ **Connection Management**: Proper cleanup
+- ✅ **Credential Security**: Environment variables only
 
 ## Troubleshooting
 
 ### Database Connection Issues
 
 **Error: "Cannot open database"**
-- Verify server address and database name
-- Check if server allows remote connections
-- Confirm username and password are correct
-- Test connection with tools like Azure Data Studio
+- Verify credentials in `bi_agent/.env`
+- Check server allows remote connections
+- Test with Azure Data Studio or similar
 
 **Error: "ODBC Driver not found"**
-- Install ODBC Driver 18 for SQL Server
-- macOS: `brew install msodbcsql18`
-- Verify driver name matches in `.env`
+- Install: `brew install msodbcsql18` (macOS)
+- Verify driver name in `.env`
 
 ### API Key Issues
 
 **Error: "API key not valid"**
-- Copy the full API key from Google AI Studio
-- Remove any extra spaces or newlines
-- Regenerate key if needed
+- Get fresh key from [Google AI Studio](https://aistudio.google.com/)
+- Check no extra spaces in `.env`
 
-**Error: "GOOGLE_API_KEY not found"**
-- Verify `.env` file exists in project root
-- Check environment variable is set correctly
+### Agent Issues
 
-### SQL Generation Issues
+**SQL generation errors**
+- Check schema is loading properly
+- Add more examples to agent instruction
+- Verify table/column names in database
 
-**Query returns no results**
-- Check if table/column names are correct
-- Verify schema information is loading properly
-- Try simpler questions first
-
-**Invalid SQL generated**
-- Schema might be incomplete
-- Add example queries to agent instruction
-- Adjust agent temperature for more conservative output
-
-### Visualization Issues
-
-**Chart not displaying**
+**Visualization not displaying**
 - Check browser console for errors
-- Verify Altair code syntax
-- DataFrame might be empty or malformed
+- Verify DataFrame has data
+- Check Altair code syntax
 
 ### Port Already in Use
 
-**Error: "Address already in use"**
 ```python
-# In app.py, change:
+# In app.py
 demo.launch(server_port=7861)  # Use different port
 ```
-
-### UV Command Not Found
-
-- Install uv: [Installation guide](https://github.com/kirenz/uv-setup)
-- Restart terminal after installation
-- Verify installation: `uv --version`
 
 ## Advanced Features
 
 ### Multi-Turn Conversations
 
-Modify the session management to maintain context across questions:
-```python
-# Keep session alive for conversation
-if not hasattr(st.session_state, 'adk_session'):
-    st.session_state.adk_session = await runner.session_service.create_session(...)
-```
+Maintain session state across questions:
 
-### Query History
-
-Add query logging to track user questions and generated SQL:
 ```python
-# In bi_service.py
-self.query_history.append({
-    'question': question,
-    'sql': sql_query,
-    'timestamp': datetime.now()
-})
+# Keep session alive
+if 'session_id' not in session_state:
+    session = await root_runner.session_service.create_session(...)
+    session_state['session_id'] = session.id
 ```
 
 ### Export Results
 
-Add download buttons for data and charts:
+Add download functionality:
+
 ```python
-# In app.py
 download_btn = gr.Button("Download CSV")
-download_btn.click(fn=lambda df: df.to_csv(), inputs=data_output)
+download_btn.click(
+    fn=lambda df: df.to_csv('results.csv'),
+    inputs=data_output
+)
+```
+
+### Custom Agents
+
+Add specialized agents to the pipeline:
+
+```python
+root_agent = SequentialAgent(
+    sub_agents=[
+        text_to_sql_agent,
+        sql_executor_agent,
+        your_custom_agent,      # Add here
+        data_formatter_agent,
+        insight_pipeline
+    ]
+)
 ```
 
 ## Learn More
 
 ### Documentation
 - [Google ADK Documentation](https://google.github.io/adk-docs/)
-- [Google ADK Sequential Agents](https://google.github.io/adk-docs/agents/workflow-agents/sequential-agents)
+- [ADK Sequential Agents](https://google.github.io/adk-docs/agents/workflow-agents/sequential-agents)
 - [Gradio Documentation](https://gradio.app/docs/)
-- [Altair Documentation](https://altair-viz.github.io/)
-- [Google AI Studio](https://aistudio.google.com/)
+- [Altair Visualization](https://altair-viz.github.io/)
 
 ### Related Resources
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
-- [Microsoft SQL Server Documentation](https://learn.microsoft.com/en-us/sql/)
-- [Pandas Documentation](https://pandas.pydata.org/docs/)
+- [SQLAlchemy](https://docs.sqlalchemy.org/)
+- [Microsoft SQL Server](https://learn.microsoft.com/en-us/sql/)
+- [COMPASS Framework](https://github.com/anthropics/anthropic-cookbook)
 
 ## License
 
@@ -658,14 +523,14 @@ MIT License - See LICENSE file for details
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please submit a Pull Request.
 
 ## Support
 
-If you encounter issues:
-1. Check the Troubleshooting section above
-2. Review the [Google ADK documentation](https://google.github.io/adk-docs/)
-3. Open an issue on GitHub with:
-   - Your Python version
+Issues? Check:
+1. Troubleshooting section above
+2. [Google ADK documentation](https://google.github.io/adk-docs/)
+3. Open a GitHub issue with:
+   - Python version
    - Error messages
    - Steps to reproduce

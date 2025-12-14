@@ -10,8 +10,8 @@ import json
 from typing import Dict, Tuple, Optional
 from sqlalchemy.engine import Engine
 
-from db_config import create_db_engine, get_schema_info, validate_connection
-from sql_executor import execute_query
+from .db_config import create_db_engine, get_schema_info, validate_connection
+from .sql_executor import execute_query
 
 
 class BIService:
