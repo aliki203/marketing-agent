@@ -140,8 +140,7 @@ with gr.Blocks(title="Marketing Campaign Builder") as demo:
     # Marketing Campaign Builder (Google ADK + Gradio)
 
     Erstelle Social-Media-Kampagnen für KMUs.  
-    Pipeline: **Strategist → Copywriter**.  
-    Zusätzlich kannst du das Ergebnis mit einem **Editor-Agent** verfeinern.
+    Pipeline: **Strategist → Copywriter**, mit optionalem **Editor-Agent** zur Verfeinerung.  
     """)
 
     with gr.Row():
