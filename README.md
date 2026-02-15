@@ -168,66 +168,62 @@ Shoppe jetzt über den Link in der Bio.
 - **Lösung**: Explizite Style-Rules in System Prompts ("Vermeide lange Aufzählungsketten"), iteratives Testen und Refinement
 - **Erkenntnis**: Prompt-Design ist ebenso wichtig wie Modell-Auswahl
 
-**2. Multi-Agent State-Management**
-- **Problem**: Verstehen, wie `state_delta` zwischen Strategist und Copywriter weitergegeben wird
-- **Lösung**: ADK-Dokumentation studiert, Debug-Logs eingefügt, `output_key` korrekt definiert
-- **Erkenntnis**: ADK abstrahiert viel, aber Verständnis der Event-Streams ist essentiell
+**2. Strukturierung des Multi-Agent-Ansatzes**
+- **Problem**: Anfangs war unklar, wie Strategist und Copywriter sinnvoll zusammenarbeiten sollen und welche Aufgaben klar getrennt werden müssen
+- **Lösung**: Rollen klar definiert (Strategie vs. Text), Pipeline visualisiert und beide Agenten zunächst getrennt getestet
+- **Erkenntnis**: Eine saubere Aufgabenverteilung verbessert Qualität, Verständlichkeit und Erweiterbarkeit deutlich
 
-**3. Async/Await in Gradio**
-- **Problem**: Gradio-Buttons rufen synchrone Funktionen auf, aber ADK-Runner sind asynchron
-- **Lösung**: Wrapper-Funktion mit `asyncio.run()` implementiert
-- **Erkenntnis**: Bridge-Pattern zwischen sync/async Welten notwendig
+**3. Integration in die Gradio-UI**
+- **Problem**: Die Verbindung zwischen Agenten-Logik und Benutzeroberfläche war anfangs unübersichtlich, insbesondere bei der Übergabe von Eingaben und der Darstellung des Outputs
+- **Lösung**: Pipeline zunächst ohne UI getestet, danach schrittweise in Gradio integriert und Output-Komponente angepasst
+- **Erkenntnis**: Technische Logik allein reicht nicht – User Experience und klare Darstellung sind entscheidend
 
 **4. Plattform-spezifische Optimierung**
 - **Problem**: Gleicher Content für Instagram und LinkedIn funktioniert nicht
 - **Lösung**: Platform-Awareness in Copywriter-Prompt, explizite Regeln für jede Plattform
 - **Erkenntnis**: LLMs können Kontext-Switch, brauchen aber klare Instruktionen
 
-**5. Teamkoordination und Aufgabenteilung**
-- **Problem**: Paralleles Arbeiten am Code führte zu Merge-Konflikten und unterschiedlichen Coding-Standards
-- **Lösung**: Klare Modul-Verantwortlichkeiten definiert, regelmäßige Code-Reviews durchgeführt
-- **Erkenntnis**: Kommunikation und Git-Workflow-Planung sind für Teamprojekte essenziell
-
-
-
+**5. Markdown-Darstellung im Output**
+- **Problem**: Wir wollten den Kampagnen-Output strukturiert mit Markdown (Überschriften, Fettdruck) darstellen. In Gradio wurde Markdown jedoch in der Textbox nicht gerendert, sondern nur als reiner Text angezeigt (z.B. `**fett**` statt fett formatiert).
+- **Lösung**: Wir haben verschiedene Anzeige-Varianten getestet (z.B. Markdown-Komponente statt Textbox). Letztlich haben wir uns bewusst für die Textbox entschieden, da sie stabiler wirkte und die Struktur trotz sichtbarer Markdown-Syntax nachvollziehbar blieb.
+- **Erkenntnis**: Technische Perfektion ist nicht immer entscheidend – wichtiger ist eine stabile, funktionierende und nachvollziehbare Lösung.
 
 
 ### Lerneffekte
 
 **Multi-Agent vs. Single-Agent**
-- Am Anfang wurde alles von einem System erledigt
-- Die Arbeit in mehreren Schritten funktionierte besser
-- Der Sequential-Ansatz brachte bessere Qualität (Strategist fokussiert auf Strategie, Copywriter auf Text)
-- Klareres Debugging und modulare Erweiterbarkeit durch Aufgabentrennung
+- Zu Beginn wurde versucht, alle Aufgaben von einem Agenten erledigen zu lassen
+- Die Aufteilung in Strategist und Copywriter führte zu deutlich strukturierteren Ergebnissen
+- Der Sequential-Ansatz sorgte für klarere Logik (erst Strategie, dann konkrete Texte)
+- Die Trennung erleichterte Tests und Anpassungen einzelner Komponenten
 
 **User Experience Design**
-- Zu viele Optionen überfordern → 5 Tonalitäten statt Freitext
-- Instant Feedback wichtig → Loading-Indikator in Gradio
-- Refinement-Funktion erhöht Nutzerzufriedenheit massiv
+- Zu viele Freiheitsgrade überfordern Nutzer → Auswahlfelder sind hilfreicher als Freitext
+- Klare Struktur im Output (Short / Medium / Long / CTA) verbessert Lesbarkeit
+- Die Refinement-Funktion erhöht den praktischen Nutzen deutlich, da Texte gezielt angepasst werden können
 
 **Praktische Anwendbarkeit**
-- Tests mit echten Beispielen (lokale Cafés, Handwerksbetriebe) zeigten:
-  - Output muss sofort verwendbar sein (keine Nacharbeit)
-  - Hashtags sind unverzichtbar für Social Media
-  - Visual Ideas helfen KMUs um die Strategie direkt zu realisieren
+- Tests mit realistischen Beispielen (z. B. lokale Betriebe) zeigten:
+  - Der Output muss sofort einsetzbar sein
+  - Hashtags sind für Social Media essenziell
+  - Visual Ideas helfen besonders KMUs bei der direkten Umsetzung
+- Ein klar strukturierter Output steigert die Praxistauglichkeit erheblich
 
 **Technische Erkenntnisse**
-- Systematisch getestete Prompts verbessern Output-Qualität maßgeblich
-- Spezialisierte Agenten steigern sowohl Flexibilität als auch Ergebnisqualität
-- Iterative Verfeinerung ist entscheidend für praxistaugliche KI-Lösungen
+- Gut formulierte Prompts beeinflussen die Output-Qualität stärker als erwartet
+- Klare Formatvorgaben stabilisieren die Ergebnisse
+- Iteratives Testen und schrittweises Anpassen sind wichtiger als einmalige „perfekte“ Prompts
+- Eine saubere Trennung von Logik (Agenten) und Oberfläche (UI) vereinfacht Weiterentwicklungen
 
-**Teamarbeit und Projektmanagement**
-- Code-Reviews verbesserten Codequalität und Wissensaustausch im Team
-- Aufgabenteilung nach Stärken (UI/UX, Agent-Entwicklung, Testing) erhöhte Effizienz
-- Gemeinsames Debugging komplexer Probleme führte zu tieferem Verständnis der ADK-Architektur
+**Teamarbeit und Projektorganisation**
+- Klare Verantwortlichkeiten reduzieren Überschneidungen
+- Regelmäßiger Austausch verbessert Verständnis und Codequalität
+- Gemeinsames Debugging fördert das technische Gesamtverständnis
 
 **Was wir beim nächsten Mal anders machen würden**
-- Früher User-Testing einplanen 
-- Caching für wiederholte Anfragen implementieren 
-- A/B-Testing verschiedener Prompt-Varianten systematisch dokumentieren
-- Klarere Git-Branch-Strategie von Projektbeginn an
-
-
+- Früher echtes User-Testing einplanen
+- Prompt-Varianten systematisch vergleichen und dokumentieren
+- Projektstruktur und Git-Workflow von Beginn an klarer definieren
 
 
 
