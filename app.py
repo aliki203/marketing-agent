@@ -135,9 +135,9 @@ def refine(current_output: str, refine_text: str):
 # Gradio UI
 # ============================================================================
 
-with gr.Blocks(title="Marketing Campaign Builder") as demo:
+with gr.Blocks(title="Social Media Ad Builder") as demo:
     gr.Markdown("""
-    # Marketing Campaign Builder (Google ADK + Gradio)
+    # Social Media Ad Builder 
 
     Erstelle Social-Media-Kampagnen für KMUs.  
     Pipeline: **Strategist → Copywriter**, mit optionalem **Editor-Agent** zur Verfeinerung.  
