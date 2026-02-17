@@ -158,8 +158,8 @@ with gr.Blocks(title="Social Media Ad Builder") as demo:
     goal = gr.Textbox(label="Marketingziel", placeholder="z.B. Reichweite, Leads, Sales", lines=1)
     extra = gr.Textbox(label="Zusatzinfos (optional)", placeholder="USPs, Preis, Besonderheiten, Aktionen ...", lines=3)
 
-    generate_btn = gr.Button("Kampagne generieren", variant="primary")
-    output = gr.Textbox(label="Kampagnen-Output", lines=18)
+    generate_btn = gr.Button("Content generieren", variant="primary")
+    output = gr.Textbox(label="Ergebnis", lines=18)
 
     gr.Markdown("## Verfeinern")
     refine_text = gr.Textbox(
